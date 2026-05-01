@@ -12,7 +12,12 @@ float angleRollAccl, anglePitchAccl, angleYawAccl;
 float rateRoll, ratePitch, rateYaw;
 float angleRollGyro, anglePitchGyro, angleYawGyro;
 
-float angleRollKalman, anglePitchKalman, angleYawKalman;
+float angleRollKalman = 0; 
+float kalmanUncertaintyRoll = 2*2; // uncertainty of the angle estimation (= 2 degrees)
+float anglePitchKalman = 0;
+float kalmanUncertaintyPitch = 2*2; // uncertainty of the angle estimation (= 2 degrees)
+
+float KalmanOutput[2] = {0, 0}; // [0] = Gues, [1] = Uncertainty
 
 float gyroX_offset = 0;
 float gyroY_offset = 0;
@@ -134,10 +139,34 @@ void calcAngles() {
   angleYawGyro += rateYaw * dt;
 }
 
-void calcAnglesKalman() {
+void calcAnglesKalman(float kalmanState,
+                      float kalmanUncertainty,
+                      float kalmanInput,
+                      float kalmanMeasurement,
+                      float dt) {
   // Kalman Filter implementation to combine accelerometer and gyroscope data
-  
+  // kalmanInput = gyro rate (rateRoll or ratePitch)
+  // kalmanMeasurement = angle from accelerometer (angleRollAccl or anglePitchAccl)
+  // kalmanState = current angle estimation
 
+  // 1. Prediction step:
+  kalmanState = kalmanState + kalmanInput * dt;
+
+  // 2. Calculate uncertainty of the prediction:
+  kalmanUncertainty = kalmanUncertainty + dt * dt * 2; // Process noise is assumed to be 2 degrees/s^2
+
+  // 3. Calculate Kalman Gain:
+  float kalmanGain = kalmanUncertainty / (kalmanUncertainty + 20); // Measurement noise is assumed to be 0.5 degrees
+
+  // 4. Update the state with the measurement:
+  kalmanState = kalmanState + kalmanGain * (kalmanMeasurement - kalmanState);
+
+  // 5. Update the uncertainty:
+  kalmanUncertainty = (1 - kalmanGain) * kalmanUncertainty;
+
+  // Store the results in the output array
+  KalmanOutput[0] = kalmanState;
+  KalmanOutput[1] = kalmanUncertainty;
 }
 
 void setup() {
@@ -160,6 +189,15 @@ void loop() {
   getSensorData();
   calcAngles();
 
+  // Calculate angles using Kalman Filter:
+  calcAnglesKalman(angleRollKalman, kalmanUncertaintyRoll, rateRoll, angleRollAccl, dt);
+  angleRollKalman = KalmanOutput[0];
+  kalmanUncertaintyRoll = KalmanOutput[1];
+
+  calcAnglesKalman(anglePitchKalman, kalmanUncertaintyPitch, ratePitch, anglePitchAccl, dt);
+  anglePitchKalman = KalmanOutput[0];
+  kalmanUncertaintyPitch = KalmanOutput[1];
+
   Serial.print(">roll:");
   Serial.println(angleRollAccl);
   
@@ -171,6 +209,12 @@ void loop() {
   
   Serial.print(">pitchgyro:");
   Serial.println(anglePitchGyro);
+
+  Serial.print(">rollKalman:");
+  Serial.println(angleRollKalman);
+  
+  Serial.print(">pitchKalman:");
+  Serial.println(anglePitchKalman);
 
   delay(100);
 }
