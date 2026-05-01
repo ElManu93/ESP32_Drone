@@ -7,7 +7,12 @@
 const uint8_t MPU9250_ADDR = 0x68;
 
 float accelX, accelY, accelZ;
-float gyroX, gyroY, gyroZ;
+float angleRollAccl, anglePitchAccl, angleYawAccl;
+
+float rateRoll, ratePitch, rateYaw;
+float angleRollGyro, anglePitchGyro, angleYawGyro;
+
+float angleRollKalman, anglePitchKalman, angleYawKalman;
 
 float gyroX_offset = 0;
 float gyroY_offset = 0;
@@ -16,6 +21,9 @@ float gyroZ_offset = 0;
 float accelX_offset = 0;
 float accelY_offset = 0;
 float accelZ_offset = 0;
+
+unsigned long lastTime;
+float dt;
 
 void writeRegister(uint8_t addr, uint8_t reg, uint8_t value) {
   Wire.beginTransmission(addr);
@@ -47,7 +55,7 @@ void setupMPU9250() {
   // BIT3 * BIT4 decide about sensitivity (0x08 == ±500 °/s)
   writeRegister(MPU9250_ADDR, 0x1B, 0x08);
   
-  Serial.println("MPU9250 bereit!");
+  //Serial.println("MPU9250 bereit!");
 }
 
 void getSensorData() {
@@ -79,9 +87,9 @@ void getSensorData() {
   accelZ = rawAccZ / 8192.0 - accelZ_offset;
 
   // ±500 °/s -> 65.5 LSB/(°/s)
-  gyroX = rawGyroX / 65.5 - gyroX_offset;
-  gyroY = rawGyroY / 65.5 - gyroY_offset;
-  gyroZ = rawGyroZ / 65.5 - gyroZ_offset;
+  rateRoll = rawGyroX / 65.5 - gyroX_offset;
+  ratePitch = rawGyroY / 65.5 - gyroY_offset;
+  rateYaw = rawGyroZ / 65.5 - gyroZ_offset;
 }
 
 void calibrateMPU9250() {
@@ -89,13 +97,13 @@ void calibrateMPU9250() {
   float gyroX_sum = 0, gyroY_sum = 0, gyroZ_sum = 0;
   float accelX_sum = 0, accelY_sum = 0, accelZ_sum = 0;
 
-  Serial.println("Calibrating MPU9250...");
+  //Serial.println("Calibrating MPU9250...");
 
   for (int i = 0; i < numReadings; i++) {
     getSensorData();
-    gyroX_sum += gyroX;
-    gyroY_sum += gyroY;
-    gyroZ_sum += gyroZ;
+    gyroX_sum += rateRoll;
+    gyroY_sum += ratePitch;
+    gyroZ_sum += rateYaw;
 
     accelX_sum += accelX;
     accelY_sum += accelY;
@@ -114,6 +122,24 @@ void calibrateMPU9250() {
   accelZ_offset = accelZ_sum / numReadings - 1.0; // To account for gravity
 }
 
+void calcAngles() {
+  // Function to calculate angles from accelerometer data
+  // * 180 / PI converts from radians to degrees
+  angleRollAccl = atan2(accelY, sqrt(accelX*accelX + accelZ*accelZ)) * 180 / PI;
+  anglePitchAccl = atan2(-accelX, sqrt(accelY*accelY + accelZ*accelZ)) * 180 / PI;
+
+  // Integrate gyro rates to get angles
+  angleRollGyro += rateRoll * dt;
+  anglePitchGyro += ratePitch * dt;
+  angleYawGyro += rateYaw * dt;
+}
+
+void calcAnglesKalman() {
+  // Kalman Filter implementation to combine accelerometer and gyroscope data
+  
+
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -126,18 +152,25 @@ void setup() {
 }
 
 void loop() {
+  // Get time difference (dt) for integration of gyro rates
+  unsigned long currentTime = micros();
+  dt = (currentTime - lastTime) / 1000000.0; // Time in seconds
+  lastTime = currentTime;
+
   getSensorData();
+  calcAngles();
 
-  // Ausgabe
-  Serial.print("Accel: ");
-  Serial.print(accelX); Serial.print(" | ");
-  Serial.print(accelY); Serial.print(" | ");
-  Serial.print(accelZ);
+  Serial.print(">roll:");
+  Serial.println(angleRollAccl);
+  
+  Serial.print(">pitch:");
+  Serial.println(anglePitchAccl);
 
-  Serial.print("   Gyro: ");
-  Serial.print(gyroX); Serial.print(" | ");
-  Serial.print(gyroY); Serial.print(" | ");
-  Serial.println(gyroZ);
+  Serial.print(">rollgyro:");
+  Serial.println(angleRollGyro);
+  
+  Serial.print(">pitchgyro:");
+  Serial.println(anglePitchGyro);
 
-  delay(500);
+  delay(100);
 }
