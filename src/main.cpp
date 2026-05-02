@@ -38,7 +38,7 @@ BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // Systemmatrix A
 BLA::Matrix<2, 1> B_KF = {dt, 0};        // Eingangsmatrix B
 BLA::Matrix<1, 2> C_KF = {1, 0};        // Ausgangsmatrix C
 // Parameterierung des KF (mehr auf Modell oder Messung verlassen)
-BLA::Matrix<2, 2> Q_cov = {0.0005*0.0005, 0, 0, 0.00001*0.00001};   // Q, Kovarianzmatrix Modellunsicherheit, Bezugsgröße: 5° bzw. 1 °/s
+BLA::Matrix<2, 2> Q_cov = {0.008*0.008, 0, 0, 0.0002*0.0002};   // Q, Kovarianzmatrix Modellunsicherheit
 BLA::Matrix<1, 1> R_cov = {0.01};    // R, Kovarianzmatrix Messrauschen
 
 // Hier keine Einstellungen nötig
@@ -151,15 +151,6 @@ void calibrateMPU9250() {
 }
 
 void calcAngles() {
-  // Updating Systemmatrix with current dt
-  A_KF = {1, -dt,
-        0,  1};
-
-  B_KF = {dt,
-        0};
-
-  A_KF_T = ~A_KF;
-
   // Function to calculate angles from accelerometer data
   // (* 180 / PI) converts from radians to degrees
   angleRollAccl = atan2(accelY, sqrt(accelX*accelX + accelZ*accelZ)) * 180 / PI;
@@ -175,7 +166,7 @@ void calcAngles() {
   if (angleRollGyro < -180) angleRollGyro += 360;
 
   if (abs(accNorm - 1.0) > 0.1) {
-    R_cov = {0.5};   // vertraue Acc NICHT
+    R_cov = {0.8};   // vertraue Acc NICHT
     } 
     
   else {
@@ -184,6 +175,15 @@ void calcAngles() {
 }
 
 void calcAnglesKalman() {
+  // Updating Systemmatrix with current dt
+  A_KF = {1, -dt,
+        0,  1};
+
+  B_KF = {dt,
+        0};
+
+  A_KF_T = ~A_KF;
+
   // --- Eingang: Gyro-Rate (°/s) ---
   BLA::Matrix<1,1> u = {rateRoll};
 
