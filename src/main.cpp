@@ -30,6 +30,12 @@ float accelZ_offset = 0;
 unsigned long lastTime;
 float dt;
 
+// --- PARAMETERS FOR THE KALMAN-FILTER ---
+// The higher R_MEASURE, the more the filter trusts the gyroscope and ignores vibrations (oscillations).
+// The higher Q_ANGLE, the faster the filter reacts to movements, but becomes more unsteady.
+float Q_ANGLE = 0.0001;
+float R_MEASURE = 0.05; 
+
 void writeRegister(uint8_t addr, uint8_t reg, uint8_t value) {
   Wire.beginTransmission(addr);
   Wire.write(reg);
@@ -153,10 +159,10 @@ void calcAnglesKalman(float kalmanState,
   kalmanState = kalmanState + kalmanInput * dt;
 
   // 2. Calculate uncertainty of the prediction:
-  kalmanUncertainty = kalmanUncertainty + dt * dt * 2; // Process noise is assumed to be 2 degrees/s^2
+  kalmanUncertainty = kalmanUncertainty + dt * Q_ANGLE; // Process noise is assumed to be 2 degrees/s^2
 
   // 3. Calculate Kalman Gain:
-  float kalmanGain = kalmanUncertainty / (kalmanUncertainty + 20); // Measurement noise is assumed to be 0.5 degrees
+  float kalmanGain = kalmanUncertainty / (kalmanUncertainty + R_MEASURE); // Measurement noise is assumed to be 0.5 degrees
 
   // 4. Update the state with the measurement:
   kalmanState = kalmanState + kalmanGain * (kalmanMeasurement - kalmanState);
