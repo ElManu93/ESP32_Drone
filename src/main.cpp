@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <Arduino.h>
+#include <BasicLinearAlgebra.h>
 
 #define SDA_PIN 32
 #define SCL_PIN 33
@@ -8,6 +9,7 @@ const uint8_t MPU9250_ADDR = 0x68;
 
 float accelX, accelY, accelZ;
 float angleRollAccl, anglePitchAccl, angleYawAccl;
+float accNorm;
 
 float rateRoll, ratePitch, rateYaw;
 float angleRollGyro, anglePitchGyro, angleYawGyro;
@@ -31,10 +33,25 @@ unsigned long lastTime;
 float dt;
 
 // --- PARAMETERS FOR THE KALMAN-FILTER ---
-// The higher R_MEASURE, the more the filter trusts the gyroscope and ignores vibrations (oscillations).
-// The higher Q_ANGLE, the faster the filter reacts to movements, but becomes more unsteady.
-float Q_ANGLE = 0.0001;
-float R_MEASURE = 0.05; 
+// Variablen eigener KF --> anpassen
+BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // Systemmatrix A
+BLA::Matrix<2, 1> B_KF = {dt, 0};        // Eingangsmatrix B
+BLA::Matrix<1, 2> C_KF = {1, 0};        // Ausgangsmatrix C
+// Parameterierung des KF (mehr auf Modell oder Messung verlassen)
+BLA::Matrix<2, 2> Q_cov = {0.0005*0.0005, 0, 0, 0.00001*0.00001};   // Q, Kovarianzmatrix Modellunsicherheit, Bezugsgröße: 5° bzw. 1 °/s
+BLA::Matrix<1, 1> R_cov = {0.01};    // R, Kovarianzmatrix Messrauschen
+
+// Hier keine Einstellungen nötig
+BLA::Matrix<2, 2> P_est = Q_cov; // Geschätzte Kovarianzmatrix des Schätzfehlers nach Update
+BLA::Matrix<2, 2> P_pred = P_est;// prädizierte Kovarianzmatrix des Schätzfehlers VOR Update
+BLA::Matrix<2,1> x_est = {0, 0};
+BLA::Matrix<2,1> x_pred = {0, 0};
+BLA::Matrix<2, 2> A_KF_T = ~A_KF;  // Systemmatrix A transponiert
+BLA::Matrix<2, 1> C_KF_T = ~C_KF;  // Ausgangsmatrix C transponiert
+BLA::Matrix<2, 1> K_KF = {0, 0};  // Kalman-Gain-Matrix
+BLA::Matrix<2, 2> I_KF = {1, 0, 0, 1};  // 2x2 Einheitsmatrix I
+
+// OUTPUT VARIABLES 
 
 void writeRegister(uint8_t addr, uint8_t reg, uint8_t value) {
   Wire.beginTransmission(addr);
@@ -104,7 +121,7 @@ void getSensorData() {
 }
 
 void calibrateMPU9250() {
-  const int numReadings = 1000;
+  const int numReadings = 500;
   float gyroX_sum = 0, gyroY_sum = 0, gyroZ_sum = 0;
   float accelX_sum = 0, accelY_sum = 0, accelZ_sum = 0;
 
@@ -134,45 +151,59 @@ void calibrateMPU9250() {
 }
 
 void calcAngles() {
+  // Updating Systemmatrix with current dt
+  A_KF = {1, -dt,
+        0,  1};
+
+  B_KF = {dt,
+        0};
+
+  A_KF_T = ~A_KF;
+
   // Function to calculate angles from accelerometer data
-  // * 180 / PI converts from radians to degrees
+  // (* 180 / PI) converts from radians to degrees
   angleRollAccl = atan2(accelY, sqrt(accelX*accelX + accelZ*accelZ)) * 180 / PI;
   anglePitchAccl = atan2(-accelX, sqrt(accelY*accelY + accelZ*accelZ)) * 180 / PI;
+  accNorm = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
 
   // Integrate gyro rates to get angles
   angleRollGyro += rateRoll * dt;
   anglePitchGyro += ratePitch * dt;
   angleYawGyro += rateYaw * dt;
+
+  if (angleRollGyro > 180) angleRollGyro -= 360;
+  if (angleRollGyro < -180) angleRollGyro += 360;
+
+  if (abs(accNorm - 1.0) > 0.1) {
+    R_cov = {0.5};   // vertraue Acc NICHT
+    } 
+    
+  else {
+        R_cov = {0.03};  // normal
+    }
 }
 
-void calcAnglesKalman(float kalmanState,
-                      float kalmanUncertainty,
-                      float kalmanInput,
-                      float kalmanMeasurement,
-                      float dt) {
-  // Kalman Filter implementation to combine accelerometer and gyroscope data
-  // kalmanInput = gyro rate (rateRoll or ratePitch)
-  // kalmanMeasurement = angle from accelerometer (angleRollAccl or anglePitchAccl)
-  // kalmanState = current angle estimation
+void calcAnglesKalman() {
+  // --- Eingang: Gyro-Rate (°/s) ---
+  BLA::Matrix<1,1> u = {rateRoll};
 
-  // 1. Prediction step:
-  kalmanState = kalmanState + kalmanInput * dt;
+  // --- Messwert ---
+  BLA::Matrix<1,1> y = {angleRollAccl};
 
-  // 2. Calculate uncertainty of the prediction:
-  kalmanUncertainty = kalmanUncertainty + dt * Q_ANGLE; // Process noise is assumed to be 2 degrees/s^2
+  // --- Prädiktion ---
+  x_pred = A_KF * x_est + B_KF * u;
+  P_pred = A_KF * P_est * A_KF_T + Q_cov;
 
-  // 3. Calculate Kalman Gain:
-  float kalmanGain = kalmanUncertainty / (kalmanUncertainty + R_MEASURE); // Measurement noise is assumed to be 0.5 degrees
+  // --- Kalman Gain ---
+  BLA::Matrix<1,1> S = C_KF * P_pred * C_KF_T + R_cov;
+  K_KF = P_pred * C_KF_T * Inverse(S);
 
-  // 4. Update the state with the measurement:
-  kalmanState = kalmanState + kalmanGain * (kalmanMeasurement - kalmanState);
+  // --- Update ---
+  x_est = x_pred + K_KF * (y - C_KF * x_pred);
+  P_est = (I_KF - K_KF * C_KF) * P_pred;
 
-  // 5. Update the uncertainty:
-  kalmanUncertainty = (1 - kalmanGain) * kalmanUncertainty;
-
-  // Store the results in the output array
-  KalmanOutput[0] = kalmanState;
-  KalmanOutput[1] = kalmanUncertainty;
+  // --- Output ---
+  angleRollKalman = x_est(0);
 }
 
 void setup() {
@@ -184,25 +215,39 @@ void setup() {
   setupMPU9250();
   delay(1000); // Warte kurz, damit sich die Sensorwerte stabilisieren können
   calibrateMPU9250();
+
+  getSensorData();
+
+  angleRollAccl = atan2(accelY, sqrt(accelX*accelX + accelZ*accelZ)) * 57.3;
+
+  x_est(0) = angleRollAccl;  // Startwinkel setzen!
+  x_est(1) = 0;              // Bias initial
 }
 
 void loop() {
   // Get time difference (dt) for integration of gyro rates
   unsigned long currentTime = micros();
   dt = (currentTime - lastTime) / 1000000.0; // Time in seconds
-  lastTime = currentTime;
+  lastTime = micros();
+
+  // --- Systemmatrix mit aktuellem dt updaten ---
+  A_KF = {1, -dt,
+          0,  1};
+
+  B_KF = {dt,
+          0};
+
+  A_KF_T = ~A_KF;
 
   getSensorData();
   calcAngles();
 
   // Calculate angles using Kalman Filter:
-  calcAnglesKalman(angleRollKalman, kalmanUncertaintyRoll, rateRoll, angleRollAccl, dt);
-  angleRollKalman = KalmanOutput[0];
-  kalmanUncertaintyRoll = KalmanOutput[1];
+  calcAnglesKalman();
 
-  calcAnglesKalman(anglePitchKalman, kalmanUncertaintyPitch, ratePitch, anglePitchAccl, dt);
-  anglePitchKalman = KalmanOutput[0];
-  kalmanUncertaintyPitch = KalmanOutput[1];
+  //calcAnglesKalman();
+  //anglePitchKalman = KalmanOutput[0];
+  //kalmanUncertaintyPitch = KalmanOutput[1];
 
   Serial.print(">roll:");
   Serial.println(angleRollAccl);
@@ -222,5 +267,8 @@ void loop() {
   Serial.print(">pitchKalman:");
   Serial.println(anglePitchKalman);
 
-  delay(100);
+  Serial.print(">K0: ");
+  Serial.println(K_KF(0));
+
+  delay(10);
 }
