@@ -38,7 +38,8 @@ BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // Systemmatrix A
 BLA::Matrix<2, 1> B_KF = {dt, 0};        // Eingangsmatrix B
 BLA::Matrix<1, 2> C_KF = {1, 0};        // Ausgangsmatrix C
 // Parameterierung des KF (mehr auf Modell oder Messung verlassen)
-BLA::Matrix<2, 2> Q_cov = {0.008*0.008, 0, 0, 0.0002*0.0002};   // Q, Kovarianzmatrix Modellunsicherheit
+BLA::Matrix<2, 2> Q_cov = {0.0008*0.0008, 0, 0, 0.00002*0.00002};   // Q, Kovarianzmatrix Modellunsicherheit
+// original BLA::Matrix<2, 2> Q_cov = {0.008*0.008, 0, 0, 0.0002*0.0002}; 
 BLA::Matrix<1, 1> R_cov = {0.01};    // R, Kovarianzmatrix Messrauschen
 
 // Hier keine Einstellungen nötig
@@ -124,8 +125,6 @@ void calibrateMPU9250() {
   const int numReadings = 500;
   float gyroX_sum = 0, gyroY_sum = 0, gyroZ_sum = 0;
   float accelX_sum = 0, accelY_sum = 0, accelZ_sum = 0;
-
-  //Serial.println("Calibrating MPU9250...");
 
   for (int i = 0; i < numReadings; i++) {
     getSensorData();
@@ -266,9 +265,6 @@ void loop() {
   
   Serial.print(">pitchKalman:");
   Serial.println(anglePitchKalman);
-
-  Serial.print(">K0: ");
-  Serial.println(K_KF(0));
 
   delay(10);
 }
