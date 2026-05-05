@@ -38,8 +38,8 @@ BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // Systemmatrix A
 BLA::Matrix<2, 1> B_KF = {dt, 0};        // Eingangsmatrix B
 BLA::Matrix<1, 2> C_KF = {1, 0};        // Ausgangsmatrix C
 // Parameterierung des KF (mehr auf Modell oder Messung verlassen)
-BLA::Matrix<2, 2> Q_cov = {0.0008*0.0008, 0, 0, 0.00002*0.00002};   // Q, Kovarianzmatrix Modellunsicherheit
-// original BLA::Matrix<2, 2> Q_cov = {0.008*0.008, 0, 0, 0.0002*0.0002}; 
+BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001};   // Q, Kovarianzmatrix Modellunsicherheit
+// original BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001}; 
 BLA::Matrix<1, 1> R_cov = {0.01};    // R, Kovarianzmatrix Messrauschen
 
 // Hier keine Einstellungen nötig
@@ -248,23 +248,30 @@ void loop() {
   //anglePitchKalman = KalmanOutput[0];
   //kalmanUncertaintyPitch = KalmanOutput[1];
 
-  Serial.print(">roll:");
-  Serial.println(angleRollAccl);
-  
-  Serial.print(">pitch:");
-  Serial.println(anglePitchAccl);
+  //Serial.print(">roll:");
+  //Serial.println(angleRollAccl);
+  //Serial.print(">rollgyro:");
+  //Serial.println(angleRollGyro);
+  //Serial.print(">rollKalman:");
+  //Serial.println(angleRollKalman);
 
-  Serial.print(">rollgyro:");
-  Serial.println(angleRollGyro);
+  // 1. Erstelle einen Puffer, der groß genug für alle Zeichen ist
+  char buffer[100]; 
+    
+  // 2. Formatiere alle drei Zeilen in diesen einen Puffer
+  // \n sorgt für den Zeilenumbruch INNERHALB der einen Sendung
+  sprintf(buffer, ">roll:%.2f\n>rollgyro:%.2f\n>rollKalman:%.2f", 
+          angleRollAccl, angleRollGyro, angleRollKalman);
   
-  Serial.print(">pitchgyro:");
-  Serial.println(anglePitchGyro);
-
-  Serial.print(">rollKalman:");
-  Serial.println(angleRollKalman);
+  // 3. Sende den gesamten Puffer als EINE Einheit
+  Serial.println(buffer);
   
-  Serial.print(">pitchKalman:");
-  Serial.println(anglePitchKalman);
+  //Serial.print(">pitch:");
+  //Serial.println(anglePitchAccl);
+  //Serial.print(">pitchgyro:");
+  //Serial.println(anglePitchGyro);
+  //Serial.print(">pitchKalman:");
+  //Serial.println(anglePitchKalman);
 
   delay(10);
 }
