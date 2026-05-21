@@ -58,6 +58,7 @@ if __name__ == "__main__":
         (df_good_q["timestamp(ms)"] >= 5) &
         (df_good_q["timestamp(ms)"] <= 7.5)
     ]
+    df_good_q["timestamp(ms)"] = ((df_good_q["timestamp(ms)"] - df_good_q["timestamp(ms)"].iloc[0]))
 
     ####### LOW Q SETTING #######
     low_q_path = f"{FOLDER_NAME}\\{'LowQ.json'}"
@@ -76,6 +77,7 @@ if __name__ == "__main__":
         (df_low_q["timestamp(ms)"] >= 7.7) &
         (df_low_q["timestamp(ms)"] <= 13.7)
     ]
+    df_low_q["timestamp(ms)"] = ((df_low_q["timestamp(ms)"] - df_low_q["timestamp(ms)"].iloc[0]))
 
     ####### PLOT DATA #######
     plot_data(df_good_q["timestamp(ms)"], [df_good_q], "Good Q Setting")

@@ -61,7 +61,17 @@ The off-diagonal elements are 0, meaning you assume the uncertainties are indepe
 
 Interpretation:
 
-- Larger values:
-  As seen in the following picture will the filter follow the measurements really closely, which outputs a really noisy signal.
-  ![HighQ](images/High_Q.png)
-- Smaller values --> more trust in the model
+- **Higher Q values:**  
+With higher Q values, the filter trusts the measurements more, which makes the output very noisy.  
+![HighQ](images/High_Q.png)  
+In this test, the sensor was placed on a table and shaken. The accelerometer reacts strongly, and the gyroscope has some drift. The Kalman filter follows the noise too closely, so the output is not good for drone control.
+
+- **Lower Q values:**  
+With lower Q values, the filter trusts the model more and reacts slower to measurements.  
+![LowQ](images/Low_Q.png)  
+The sensor was first slowly set upright and then rotated by 180°. The gyroscope overshoots, and the filter takes about 4 seconds to correct itself, which is too slow for real-time control.
+
+- **Good Q values:**  
+With good Q values, there is a balance between noise and response speed.  
+![GoodQ](images/Good_Q.png)  
+The same test as in the low Q case was done. The filter removes most noise but still follows the motion well. It stabilizes in about 0.5 seconds, which is good for a drone.
