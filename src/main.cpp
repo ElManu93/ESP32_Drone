@@ -38,7 +38,7 @@ BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // Systemmatrix A
 BLA::Matrix<2, 1> B_KF = {dt, 0};        // Eingangsmatrix B
 BLA::Matrix<1, 2> C_KF = {1, 0};        // Ausgangsmatrix C
 // Parameterierung des KF (mehr auf Modell oder Messung verlassen)
-BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001};   // Q, Kovarianzmatrix Modellunsicherheit
+BLA::Matrix<2, 2> Q_cov = {0.07*0.07, 0, 0, 0.001*0.001};   // Q, Kovarianzmatrix Modellunsicherheit
 // original BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001}; 
 BLA::Matrix<1, 1> R_cov = {0.01};    // R, Kovarianzmatrix Messrauschen
 

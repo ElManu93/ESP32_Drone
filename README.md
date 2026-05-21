@@ -38,7 +38,7 @@ In order to adjust the filter we have two matrices which set the model uncertain
 
 ##### Q_cov – Process Noise Covariance (Model Uncertainty)
 
-The *Q_cov* matrix is being implemnted in the definition part of the code as shown:
+The *Q_cov* matrix is being implented in the definition part of the code as shown:
 
 BLA::Matrix<2, 2> Q_cov = {
     0.008*0.008, 0,
@@ -61,5 +61,7 @@ The off-diagonal elements are 0, meaning you assume the uncertainties are indepe
 
 Interpretation:
 
-- Larger values --> less trust in the model --> filter relies more on measurements
+- Larger values:
+  As seen in the following picture will the filter follow the measurements really closely, which outputs a really noisy signal.
+  ![alt text](High_Q.png)
 - Smaller values --> more trust in the model
