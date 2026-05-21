@@ -63,5 +63,5 @@ Interpretation:
 
 - Larger values:
   As seen in the following picture will the filter follow the measurements really closely, which outputs a really noisy signal.
-  ![alt text](High_Q.png)
+  ![HighQ](images/High_Q.png)
 - Smaller values --> more trust in the model
