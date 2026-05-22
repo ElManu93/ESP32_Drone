@@ -75,3 +75,50 @@ The sensor was first slowly set upright and then rotated by 180°. The gyroscope
 With good Q values, there is a balance between noise and response speed.  
 ![GoodQ](images/Good_Q.png)  
 The same test as in the low Q case was done. The filter removes most noise but still follows the motion well. It stabilizes in about 0.5 seconds, which is good for a drone.
+
+##### Angle Wraparound Problem (360° Jump Issue)
+
+During fast rotations, the gyroscope angle can continuously increase or decrease beyond the normal angle range.
+
+The problem is that the Kalman filter expects angles in a limited range, typically:
+
+- -180° to +180°
+
+Without limiting the angle range, the gyroscope angle keeps accumulating over time.  
+After several full rotations, the value grows continuously, even though physically the drone has only rotated in circles.
+
+This creates a problem for the Kalman filter:
+
+- The drone performs multiple full rotations (rolls or loopings)
+- The gyroscope keeps adding angle values (e.g. 360°, 720°, 1080° ...)
+- The accelerometer still reports a bounded angle around ±180°
+- The Kalman filter sees a huge mismatch between prediction and measurement
+
+This leads to:
+
+- large temporary estimation errors
+- wrong correction spikes
+- unstable control output for a short time
+
+![GyroAccumulationError](images/360Jumps.png)
+
+The picture shows really well those unstable states of the filter. Even though it tries to get back to the measurements it takes always quiet some time to be at a stable rate again.
+
+This is especially important for drones because they can perform fast **rolls and loopings**, where multiple full rotations happen within seconds.  
+During such maneuvers, the raw gyro integration becomes invalid for control if not corrected.
+
+To fix this, the angle is wrapped back into the range from -180° to +180°:
+
+```cpp
+if (angleRollGyro > 180) angleRollGyro -= 360;
+if (angleRollGyro < -180) angleRollGyro += 360;
+```
+
+This technique is called **angle wraparound correction**.
+
+Interpretation:
+
+- If the angle becomes larger than +180°, 360° is subtracted
+- If the angle becomes smaller than -180°, 360° is added
+
+This ensures the gyro angle stays in a valid range and prevents accumulation errors from affecting the Kalman filter during aggressive drone maneuvers.

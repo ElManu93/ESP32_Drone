@@ -33,26 +33,23 @@ unsigned long lastTime;
 float dt;
 
 // --- PARAMETERS FOR THE KALMAN-FILTER ---
-// Variablen eigener KF --> anpassen
-BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // Systemmatrix A
-BLA::Matrix<2, 1> B_KF = {dt, 0};        // Eingangsmatrix B
-BLA::Matrix<1, 2> C_KF = {1, 0};        // Ausgangsmatrix C
-// Parameterierung des KF (mehr auf Modell oder Messung verlassen)
-BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001};   // Q, Kovarianzmatrix Modellunsicherheit
-// original BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001}; 
-BLA::Matrix<1, 1> R_cov = {0.01};    // R, Kovarianzmatrix Messrauschen
+BLA::Matrix<2, 2> A_KF = {1, -dt, 0,  1};  // System matrix A
+BLA::Matrix<2, 1> B_KF = {dt, 0};        // Input matrix B
+BLA::Matrix<1, 2> C_KF = {1, 0};        // Output matrix C
 
-// Hier keine Einstellungen nötig
-BLA::Matrix<2, 2> P_est = Q_cov; // Geschätzte Kovarianzmatrix des Schätzfehlers nach Update
-BLA::Matrix<2, 2> P_pred = P_est;// prädizierte Kovarianzmatrix des Schätzfehlers VOR Update
+// Settings for the Kalman Filter
+BLA::Matrix<2, 2> Q_cov = {0.007*0.007, 0, 0, 0.0001*0.0001};   // Q, Covarianz matrix process noise
+BLA::Matrix<1, 1> R_cov = {0.01};     // R, Covarianz matrix measurement noise
+
+// --- VARIABLES FOR THE KALMAN-FILTER ---
+BLA::Matrix<2, 2> P_est = Q_cov;      // Guessed initial error covariance matrix P
+BLA::Matrix<2, 2> P_pred = P_est;     // Predicted error covariance matrix P
 BLA::Matrix<2,1> x_est = {0, 0};
 BLA::Matrix<2,1> x_pred = {0, 0};
-BLA::Matrix<2, 2> A_KF_T = ~A_KF;  // Systemmatrix A transponiert
-BLA::Matrix<2, 1> C_KF_T = ~C_KF;  // Ausgangsmatrix C transponiert
-BLA::Matrix<2, 1> K_KF = {0, 0};  // Kalman-Gain-Matrix
-BLA::Matrix<2, 2> I_KF = {1, 0, 0, 1};  // 2x2 Einheitsmatrix I
-
-// OUTPUT VARIABLES 
+BLA::Matrix<2, 2> A_KF_T = ~A_KF;     // Transponed system matrix A
+BLA::Matrix<2, 1> C_KF_T = ~C_KF;     // Transponed output matrix C
+BLA::Matrix<2, 1> K_KF = {0, 0};      // Kalman-Gain-Matrix
+BLA::Matrix<2, 2> I_KF = {1, 0, 0, 1};  // 2x2 Identity matrix
 
 void writeRegister(uint8_t addr, uint8_t reg, uint8_t value) {
   Wire.beginTransmission(addr);
@@ -164,6 +161,8 @@ void calcAngles() {
   if (angleRollGyro > 180) angleRollGyro -= 360;
   if (angleRollGyro < -180) angleRollGyro += 360;
 
+  // Dynamic adjustment of R_cov based on accelerometer reliability in order to trust the accelerometer
+  // more when it seems reliable and less when it seems unreliable (e.g., during fast movements or vibrations)
   if (abs(accNorm - 1.0) > 0.1) {
     R_cov = {0.8};   // vertraue Acc NICHT
     } 

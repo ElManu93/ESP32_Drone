@@ -17,7 +17,7 @@ def plot_data(time_vec: pd.Series, sensor_data: list[pd.DataFrame], title: str):
     angle from the gyroscope and the roll angle from the Kalman filter.
     '''
 
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 5))
     for i, df in enumerate(sensor_data):
         plt.subplot(len(sensor_data), 1, i+1)
         plt.plot(time_vec, df["roll"], label="Accelerometer")
@@ -52,10 +52,9 @@ if __name__ == "__main__":
     df_good_q["timestamp(ms)"] = ((df_good_q["timestamp(ms)"] - df_good_q["timestamp(ms)"].iloc[0]))
 
     df_good_q = df_good_q.groupby('timestamp(ms)').first().reset_index()
-    print(df_good_q.head())
     # Zeitbereich beschneiden
     df_good_q = df_good_q[
-        (df_good_q["timestamp(ms)"] >= 5) &
+        (df_good_q["timestamp(ms)"] >= 3.1) &
         (df_good_q["timestamp(ms)"] <= 7.5)
     ]
     df_good_q["timestamp(ms)"] = ((df_good_q["timestamp(ms)"] - df_good_q["timestamp(ms)"].iloc[0]))
@@ -79,9 +78,28 @@ if __name__ == "__main__":
     ]
     df_low_q["timestamp(ms)"] = ((df_low_q["timestamp(ms)"] - df_low_q["timestamp(ms)"].iloc[0]))
 
+    ####### 360° Jumps #######
+    jump_path = f"{FOLDER_NAME}\\{'360Jumps.json'}"
+    df_jumps = pd.read_csv(jump_path, sep=",")
+    df_jumps['timestamp(ms)'] = df_jumps['timestamp(ms)'].round(1)
+    df_jumps["timestamp(ms)"] = ((df_jumps["timestamp(ms)"] - df_jumps["timestamp(ms)"].iloc[0]))
+
+    df_jumps["roll"] = df_jumps["roll"].ffill()
+    df_jumps["rollgyro"] = df_jumps["rollgyro"].ffill()
+    df_jumps["rollKalman"] = df_jumps["rollKalman"].ffill()
+    df_jumps = df_jumps.groupby('timestamp(ms)').first().reset_index()
+
+    # Zeitbereich beschneiden
+    df_jumps = df_jumps[
+        (df_jumps["timestamp(ms)"] >= 10.0) &
+        (df_jumps["timestamp(ms)"] <= 27.0)
+    ]
+    df_jumps["timestamp(ms)"] = ((df_jumps["timestamp(ms)"] - df_jumps["timestamp(ms)"].iloc[0]))
+
     ####### PLOT DATA #######
     plot_data(df_good_q["timestamp(ms)"], [df_good_q], "Good Q Setting")
     plot_data(df_high_q["timestamp(ms)"], [df_high_q], "High Q Setting")
     plot_data(df_low_q["timestamp(ms)"], [df_low_q], "Low Q Setting")
+    plot_data(df_jumps["timestamp(ms)"], [df_jumps], "360° Jumps")
 
     plt.show()  # Open plots all at once
